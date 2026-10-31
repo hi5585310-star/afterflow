@@ -136,10 +136,16 @@ namespace {
         { true, 32, 16, false },
         { true, 40, 20, false },
         { false, 0, 0, false },
-        // stage 9 (ultra easy): wider correction window in every mode, a larger
-        // ship window, a wider orb timing search and more search time so the
-        // larger window does not run out of budget. it never adds clicks.
+        // stages 9-14: each one widens the correction window in every mode, the
+        // ship window and the orb timing search, and gives the search a little
+        // more time so the larger window does not run out of budget. budgets stay
+        // under one 60fps frame (16.7ms). these stages never add clicks.
         { true, 56, 32, false, 12, 10, 10.0, "ultra easy" },
+        { true, 64, 36, false, 14, 12, 11.0, "extra easy" },
+        { true, 72, 40, false, 16, 14, 12.0, "super easy" },
+        { true, 80, 44, false, 20, 16, 12.0, "mega easy" },
+        { true, 96, 48, false, 24, 20, 13.0, "hyper easy" },
+        { true, 120, 56, false, 28, 24, 14.0, "max easy" },
     };
     constexpr int STAGE_TABLE_SIZE = sizeof(STAGE_TABLE) / sizeof(STAGE_TABLE[0]);
     constexpr int STAGE_OFF_INDEX = 7;
@@ -3005,7 +3011,7 @@ finally {
         if (hasWave) {
             horizonTicks = fullWaveHorizon(isMini);
         }
-        int maxDelayTicks = st(hasWave ? state.ticksWaveMode : (hasShip ? std::clamp(state.shipMaxDelayTicks, 0, 16) : state.ticksAllModes));
+        int maxDelayTicks = st(hasWave ? state.ticksWaveMode : (hasShip ? std::clamp(state.shipMaxDelayTicks, 0, 32) : state.ticksAllModes));
         if (maxDelayTicks <= 0) {
             state.hasAppliedInput = isDown;
             return false;
@@ -3217,7 +3223,7 @@ $on_mod(Loaded) {
         }
     });
     say("starting mode: {}", stageBanner());
-    say("{} cycles anywhere: 2/2 -> 4/4 -> 8/8 -> 16/8 -> 24/12 -> 32/16 -> 40/20 -> off -> 56/32 (stage 9 ultra easy)", stageKey());
+    say("{} cycles anywhere: 2/2 -> 4/4 -> 8/8 -> 16/8 -> 24/12 -> 32/16 -> 40/20 -> off -> 56/32 -> 64/36 -> 72/40 -> 80/44 -> 96/48 -> 120/56 (stages 9-14, easiest last)", stageKey());
     say("{} toggles the terminal", terminalKey());
     say("host os: {} ({})", hostOSName(), hostOSDescription());
     checkForUpdates(true);
