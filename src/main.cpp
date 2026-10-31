@@ -119,6 +119,12 @@ namespace {
         int ticksAllModes;
         int ticksWaveMode;
         bool isCustom;
+        // per-stage tuning. the defaults match the values readSettings() sets,
+        // so stages that leave these out behave exactly as before.
+        int shipTicks = 4;
+        int orbWindowTicks = 6;
+        double budgetMilliseconds = 8.0;
+        char const* label = nullptr;
     };
 
     constexpr Stage STAGE_TABLE[] = {
@@ -130,8 +136,14 @@ namespace {
         { true, 32, 16, false },
         { true, 40, 20, false },
         { false, 0, 0, false },
+        // stage 9 (ultra easy): wider correction window in every mode, a larger
+        // ship window, a wider orb timing search and more search time so the
+        // larger window does not run out of budget. it never adds clicks.
+        { true, 56, 32, false, 12, 10, 10.0, "ultra easy" },
     };
     constexpr int STAGE_TABLE_SIZE = sizeof(STAGE_TABLE) / sizeof(STAGE_TABLE[0]);
+    constexpr int STAGE_OFF_INDEX = 7;
+    static_assert(!STAGE_TABLE[STAGE_OFF_INDEX].isEnabled, "STAGE_OFF_INDEX must point at the off stage");
 
     struct QueuedInput {
         int ticksRemaining;
@@ -1814,6 +1826,9 @@ finally {
         state.isEnabled = stageDefinition.isEnabled;
         state.ticksAllModes = stageDefinition.ticksAllModes;
         state.ticksWaveMode = stageDefinition.ticksWaveMode;
+        state.shipMaxDelayTicks = stageDefinition.shipTicks;
+        state.orbWindowTicks = stageDefinition.orbWindowTicks;
+        state.userBudgetMilliseconds = stageDefinition.budgetMilliseconds;
     }
 
     std::string stageText() {
@@ -1826,6 +1841,12 @@ finally {
     std::string stageBanner() {
         if (!state.isEnabled) {
             return "stage off (100% raw input)";
+        }
+        auto const* stageLabel = STAGE_TABLE[state.stageIndex].label;
+        if (stageLabel) {
+            return fmt::format("stage {} ({}): {} ticks all | {} ticks wave | {} ticks ship ({:g}f all | {:g}f wave | {:g}f ship @ 60fps)",
+                state.stageIndex + 1, stageLabel, state.ticksAllModes, state.ticksWaveMode, state.shipMaxDelayTicks,
+                state.ticksAllModes / 4.f, state.ticksWaveMode / 4.f, state.shipMaxDelayTicks / 4.f);
         }
         return fmt::format("stage {}: {} ticks all | {} ticks wave ({:g}f all | {:g}f wave @ 60fps)",
             state.stageIndex + 1, state.ticksAllModes, state.ticksWaveMode, state.ticksAllModes / 4.f, state.ticksWaveMode / 4.f);
@@ -3177,7 +3198,7 @@ $on_mod(Loaded) {
     int savedStageIndex = std::clamp(Mod::get()->getSavedValue<int>("stage", 0), 0, STAGE_TABLE_SIZE - 1);
     if (Mod::get()->getSavedValue<int>("stage-schema", 1) < STAGE_SCHEMA_VERSION) {
         if (savedStageIndex == 6) {
-            savedStageIndex = STAGE_TABLE_SIZE - 1;
+            savedStageIndex = STAGE_OFF_INDEX;
         }
         Mod::get()->setSavedValue("stage", savedStageIndex);
         Mod::get()->setSavedValue("stage-schema", STAGE_SCHEMA_VERSION);
@@ -3196,7 +3217,7 @@ $on_mod(Loaded) {
         }
     });
     say("starting mode: {}", stageBanner());
-    say("{} cycles anywhere: 2/2 -> 4/4 -> 8/8 -> 16/8 -> 24/12 -> 32/16 -> 40/20 -> off", stageKey());
+    say("{} cycles anywhere: 2/2 -> 4/4 -> 8/8 -> 16/8 -> 24/12 -> 32/16 -> 40/20 -> off -> 56/32 (stage 9 ultra easy)", stageKey());
     say("{} toggles the terminal", terminalKey());
     say("host os: {} ({})", hostOSName(), hostOSDescription());
     checkForUpdates(true);
